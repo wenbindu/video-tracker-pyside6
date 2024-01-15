@@ -15,8 +15,6 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 
-from video import ClickableLabel
-
 import os
 
 import logging
@@ -215,7 +213,7 @@ app = QApplication(sys.argv)
 # 实例化窗体并显示
 window = MainWindow()
 window.show()
-window.play()
+# window.play()
 
 # 运行应用程序的事件循环
 sys.exit(app.exec())
