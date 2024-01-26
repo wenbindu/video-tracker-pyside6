@@ -1,5 +1,7 @@
 import sys
 import os
+from PySide6.QtCore import QProcess
+import time
 
 try:
     from importlib import metadata as importlib_metadata
@@ -19,24 +21,21 @@ from PySide6.QtWidgets import (
     QWidget,
     QFileDialog,
     QMessageBox,
-    QPlainTextEdit
+    QPlainTextEdit,
 )
 from PySide6.QtGui import QCloseEvent
-from videotrackersystem.analyse import frame_generator
-from videotrackersystem.core import logger
-from videotrackersystem.analyse import get_video_info
+from videotrackersystem.core import get_current_dir, logger
 
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
 
-
 class VideoTrackerSystem(QMainWindow):
     def __init__(self):
         super().__init__()
-
+        self.p = None
         self.init_ui()
-    
+
     def init_ui(self):
         # set window title
         self.setWindowTitle("视频分析系统V1.0")
@@ -95,10 +94,10 @@ class VideoTrackerSystem(QMainWindow):
         container.setLayout(main_layout)
         # 将容器控件设置为窗体的中心控件
         self.setCentralWidget(container)
-        
+
     def message(self, s):
         self.text.appendPlainText(s)
-    
+
     def show_error_message(self):
         # Create a QMessageBox with an error type
         error_box = QMessageBox()
@@ -113,6 +112,9 @@ class VideoTrackerSystem(QMainWindow):
         filename, _ = QFileDialog.getOpenFileName(
             self, "上传视频", "", "视频文件 (*.mp4 *.avi)"
         )
+
+        if not filename:
+            return
 
         # Add items to the QListWidget
         item = QListWidgetItem()
@@ -144,6 +146,8 @@ class VideoTrackerSystem(QMainWindow):
         # 这里添加分析视频的逻辑
         self.message("开始分析视频...")
         self.analyze_button.setEnabled(False)
+        time.sleep(0.5)
+
         items = []
         for x in range(self.video_list.count()):
             item_at_index = self.video_list.item(x)
@@ -154,24 +158,67 @@ class VideoTrackerSystem(QMainWindow):
                 items.append(label_text)
             else:
                 logger.error(f"there is no label: {item_at_index}")
-        
+
         logger.info(f"all the videos: {items}")
         # justify the exist for every row in items.
-        # for _item in items:
-        #     self.message(f"开始分析:{_item}")
-        #     if not os.path.exists(_item):
-        #         logger.error(f"文件[{_item}]不存在")
-        #         self.message(f"异常:{_item} 文件不存在")
-        #     # get video info
-        #     vinfo = get_video_info(_item)
-        #     self.message(f"width: {vinfo.width}, \nheight: {vinfo.height}, \nfps: {vinfo.fps}, \ntotalFrames:{vinfo.total_frames}")
-        #     # analyse video with model.
-        #     for idx_frame, ret_frame in frame_generator(_item, stripe=5):
-        #         logger.info(idx_frame)
-        #         self.message(f"{idx_frame}: {ret_frame}")
+        if not items:
+            self.message("视频列表为空, 请添加视频")
+            self.analyze_button.setEnabled(True)
+            return
+
+        items = list(set(items))
+
+        self.message(f"视频待分析列表: {items}")
+        time.sleep(0.5)
+
+        for _item in items:
+            if not os.path.exists(_item):
+                logger.error(f"文件[{_item}]不存在")
+                self.message(f"异常:{_item} 文件不存在")
+                return
+        # begin to analyze
+        if self.p is None:
+            self.message("启动视频分析器...")
+            time.sleep(0.5)
+            self.p = QProcess()
+            self.p.readyReadStandardOutput.connect(self.handle_stdout)
+            self.p.readyReadStandardError.connect(self.handle_stderr)
+            self.p.stateChanged.connect(self.handle_state)
+            self.p.finished.connect(self.process_finished)
+            args = [os.path.join(get_current_dir(), "analyse.py"), "--paths"]
+            args.extend(items)
+            args.extend(["--stripe", "1000"])
+            self.p.start("python", args)
+        else:
+            self.message("有视频任务在分析中！")
+
+    def handle_stderr(self):
+        data = self.p.readAllStandardError()
+        stderr = bytes(data).decode("utf8")
+        # Extract progress if it is in the data.
+        # progress = simple_percent_parser(stderr)
+        # if progress:
+        #     self.progress.setValue(progress)
+        self.message(stderr)
+
+    def handle_stdout(self):
+        data = self.p.readAllStandardOutput()
+        stdout = bytes(data).decode("utf8")
+        self.message(stdout)
+
+    def handle_state(self, state):
+        states = {
+            QProcess.NotRunning: "空闲中",
+            QProcess.Starting: "已开始",
+            QProcess.Running: "运行中",
+        }
+        state_name = states[state]
+        self.message(f"视频分析器: {state_name}")
+
+    def process_finished(self):
+        self.message("视频分析任务结束.\n")
+        self.p = None
         self.analyze_button.setEnabled(True)
-            
-        
 
     def export_result(self):
         self.message("开始导出分析结果...\n")
@@ -195,20 +242,20 @@ class VideoTrackerSystem(QMainWindow):
             row = self.video_list.row(item)
             self.video_list.takeItem(row)
             self.text(f"移除:{label_text}")
-    
+
     def closeEvent(self, event: QCloseEvent):
         # reply = QMessageBox.question(self, '信息', '你确定要退出吗?',
         #                              QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         box = QMessageBox()
         box.setIcon(QMessageBox.Question)
-        box.setWindowTitle('提示')
-        box.setText('确定要退出吗?')
-        box.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+        box.setWindowTitle("提示")
+        box.setText("确定要退出吗?")
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         buttonY = box.button(QMessageBox.Yes)
-        buttonY.setText('是')
+        buttonY.setText("是")
         buttonN = box.button(QMessageBox.No)
-        buttonN.setText('否')
-        box.exec_()
+        buttonN.setText("否")
+        box.exec()
 
         if box.clickedButton() == buttonY:
             event.accept()
@@ -259,11 +306,11 @@ def main():
     # this is set with setApplicationName().
 
     # Find the name of the module that was used to start the app
-    app_module = sys.modules['__main__'].__package__
+    app_module = sys.modules["__main__"].__package__
     # Retrieve the app's metadata
     metadata = importlib_metadata.metadata(app_module)
 
-    QApplication.setApplicationName(metadata['Formal-Name'])
+    QApplication.setApplicationName(metadata["Formal-Name"])
 
     app = QApplication(sys.argv)
     main_window = VideoTrackerSystem()

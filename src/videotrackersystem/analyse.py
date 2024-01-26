@@ -6,6 +6,9 @@ import onnxruntime as ort
 import numpy as np
 from collections import defaultdict
 import os
+import argparse
+import sys
+
 
 CLASSES = {
     0: "人",
@@ -90,10 +93,10 @@ CLASSES = {
     79: "牙刷",
 }
 
-onnx_model = os.path.join(get_current_dir(), "yolov8s.onnx")
+onnx_model = os.path.join(get_current_dir(), "blackcat-v1.onnx")
 iou_thres = 0.5
 confidence_thres = 0.5
-logger.info(f"onnx path: {onnx_model}")
+# sys.stdout.write(f"onnx path: {onnx_model}\n")
 
 
 def get_video_info(path):
@@ -173,7 +176,7 @@ def frame_generator(path, stripe=5):
     input_shape = model_inputs[0].shape
     input_width = input_shape[2]
     input_height = input_shape[3]
-    logger.info(f"model input: width: {input_width}, height: {input_height}")
+    sys.stdout.write(f"model input: width: {input_width}, height: {input_height}\n")
 
     cap = cv2.VideoCapture(path)
     count = 0
@@ -195,5 +198,29 @@ def frame_generator(path, stripe=5):
         outputs = session.run(None, {model_inputs[0].name: image_data})
         # Perform post-processing on the outputs to obtain output image.
         frame_ret = postprocess(outputs) 
-        logger.info(frame_ret)
+        # logger.info(frame_ret)
         yield count, frame_ret
+
+
+
+if __name__ == "__main__":
+    # Create an argument parser to handle command-line arguments
+    parser = argparse.ArgumentParser()
+    # parser.add_argument("--path", type=str, help="Input your video path.")
+    parser.add_argument("--paths", metavar='N', type=str, nargs='+',
+                    help='List of path strings')
+    parser.add_argument("--stripe", type=int, default=5, help="Stripe.")
+    args = parser.parse_args()
+
+    for path in args.paths:
+        sys.stdout.write(f"开始分析:{path}\n{'*'*20}")
+        vinfo = get_video_info(path)
+        sys.stdout.write(f"width: {vinfo.width}, \nheight: {vinfo.height}, \nfps: {vinfo.fps}, \ntotalFrames:{vinfo.total_frames}")
+
+        for frame_idx, frame_ret in frame_generator(path, args.stripe):
+            if frame_idx % 1000 == 0:
+                sys.stdout.write(f"完成: {frame_idx/vinfo.total_frames:.0%}\n")
+            if frame_ret:
+                sys.stdout.write(f"{frame_ret}\n")
+
+        sys.stdout.write(f"完成: 100%\n{'*'*16}")

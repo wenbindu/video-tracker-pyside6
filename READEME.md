@@ -23,10 +23,11 @@
 
 ```sh
 pip install briefcase
-
+# init
 briefcase new
-
+# dev
 briefcase dev
+# package
 
 
 ```
