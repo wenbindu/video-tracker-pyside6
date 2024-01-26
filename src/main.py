@@ -1,3 +1,4 @@
+from sqlite3 import Time
 import sys
 import os
 from PySide6.QtWidgets import (
@@ -14,23 +15,11 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox
 )
+from analyse import frame_generator
+from core import logger
+from analyse import get_video_info
+from PySide6.QtCore import QTimer
 
-import os
-
-import logging
-
-# create logger
-logger = logging.getLogger('vtracker')
-logger.setLevel(logging.DEBUG)
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-# create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# add formatter to ch
-ch.setFormatter(formatter)
-# add ch to logger
-logger.addHandler(ch)
 
 
 root_path = os.path.dirname(os.path.realpath(__file__))
@@ -65,6 +54,7 @@ class MainWindow(QMainWindow):
         # 创建文本框
         self.analysis_result_text = QTextEdit()
         self.analysis_result_text.setReadOnly(True)  # 设置文本框为只读
+        self.analysis_result_text.show()
 
         # 创建按钮
         self.upload_button = QPushButton("上传视频", self)
@@ -98,6 +88,9 @@ class MainWindow(QMainWindow):
         container.setLayout(main_layout)
         # 将容器控件设置为窗体的中心控件
         self.setCentralWidget(container)
+        # timer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.analyze_videos)
     
     def show_error_message(self):
         # Create a QMessageBox with an error type
@@ -153,15 +146,26 @@ class MainWindow(QMainWindow):
                 items.append(label_text)
             else:
                 logger.error(f"there is no label: {item_at_index}")
-            
+        
         logger.info(f"all the videos: {items}")
+        # begin the timer
+        self.timer.start(1000)
         # justify the exist for every row in items.
         for _item in items:
+            self.analysis_result_text.append(f"开始分析:{_item}")
             if not os.path.exists(_item):
                 logger.error(f"文件[{_item}]不存在")
-        # 开始分析
+                self.analysis_result_text.append(f"异常:{_item} 文件不存在")
+            # get video info
+            vinfo = get_video_info(_item)
+            self.analysis_result_text.append(f"width: {vinfo.width}, \nheight: {vinfo.height}, \nfps: {vinfo.fps}, \ntotalFrames:{vinfo.total_frames}")
+            # analyse video with model.
+            for idx_frame, ret_frame in frame_generator(_item, stripe=5):
+                logger.info(idx_frame)
+                self.analysis_result_text.append(f"{idx_frame}: {ret_frame}")
+            
+        self.timer.stop()
         
-
 
     def export_result(self):
         self.analysis_result_text.append("开始导出分析结果...\n")
@@ -204,7 +208,9 @@ class MainWindow(QMainWindow):
         item.setSizeHint(item_widget.sizeHint())
         self.video_list.addItem(item)
         self.video_list.setItemWidget(item, item_widget)
-        self.show_error_message()
+        # self.show_error_message()
+
+
 
 
 # 创建应用程序实例
