@@ -12,3 +12,21 @@
 - 导出结果：导出excel或者csv
 - 清空列表：清空列表和日志信息
 
+
+## QA 
+
+1. QA: 当分析视频时，日志无法实时显示更新
+   Solution: Signal failed, Timer failed, and Test MultiThread.
+
+
+## Build&Deploy
+
+```sh
+pip install briefcase
+
+briefcase new
+
+briefcase dev
+
+
+```

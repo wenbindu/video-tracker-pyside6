@@ -1,7 +1,7 @@
-import video
-from core import logger
+from videotrackersystem import video
+from videotrackersystem.core import logger
 import cv2
-from core import letterbox, get_current_dir
+from videotrackersystem.core import letterbox, get_current_dir
 import onnxruntime as ort
 import numpy as np
 from collections import defaultdict

@@ -40,6 +40,8 @@ class Window(QMainWindow):
         layout.addWidget(self.longRunningBtn)
         self.centralWidget.setLayout(layout)
 
+    
+
     def countClicks(self):
         self.clicksCount += 1
         self.clicksLabel.setText(f"Counting: {self.clicksCount} clicks")
