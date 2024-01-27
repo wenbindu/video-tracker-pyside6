@@ -40,7 +40,7 @@ class VideoTrackerSystem(QMainWindow):
 
     def init_ui(self):
         # set window title
-        self.setWindowTitle("视频分析系统V1.0")
+        self.setWindowTitle("视频检测物体识别统计软件")
         # set width/height
         self.setFixedSize(800, 470)
         # video list
