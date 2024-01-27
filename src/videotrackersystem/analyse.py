@@ -8,6 +8,7 @@ from collections import defaultdict
 import os
 import argparse
 import sys
+import pickle
 
 
 CLASSES = {
@@ -211,16 +212,20 @@ if __name__ == "__main__":
                     help='List of path strings')
     parser.add_argument("--stripe", type=int, default=5, help="Stripe.")
     args = parser.parse_args()
+    ret = {}
 
     for path in args.paths:
         sys.stdout.write(f"开始分析:{path}\n{'*'*20}")
         vinfo = get_video_info(path)
         sys.stdout.write(f"width: {vinfo.width}, \nheight: {vinfo.height}, \nfps: {vinfo.fps}, \ntotalFrames:{vinfo.total_frames}")
-
-        for frame_idx, frame_ret in frame_generator(path, args.stripe):
-            if frame_idx % 1000 == 0:
+        ret[path] = []
+        for frame_idx, frame_ret in frame_generator(path, vinfo.fps):
+            if frame_idx % (vinfo.fps * 10) == 0:
                 sys.stdout.write(f"完成: {frame_idx/vinfo.total_frames:.0%}\n")
             if frame_ret:
-                sys.stdout.write(f"{frame_ret}\n")
+                sys.stdout.write(f"{frame_ret}")
+                ret[path].append([f"{frame_idx}/{vinfo.total_frames}", frame_ret])
 
         sys.stdout.write(f"完成: 100%\n{'*'*16}")
+        with open(os.path.join(get_current_dir(), ".tmp-task.txt"), "wb") as f:
+            f.write(pickle.dumps(ret))

@@ -28,6 +28,9 @@ briefcase new
 # dev
 briefcase dev
 # package
+briefcase package
 
+
+briefcase package <platform> <output format>
 
 ```

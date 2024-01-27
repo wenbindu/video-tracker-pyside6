@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QCloseEvent
 from videotrackersystem.core import get_current_dir, logger
+from videotrackersystem.config import style
+from videotrackersystem.export import export_xlsx
 
 
 root_path = os.path.dirname(os.path.realpath(__file__))
@@ -65,15 +67,19 @@ class VideoTrackerSystem(QMainWindow):
         # 创建按钮
         self.upload_button = QPushButton("上传视频", self)
         self.upload_button.clicked.connect(self.upload_videos)
+        self.upload_button.setObjectName("btnUpload")
 
         self.analyze_button = QPushButton("分析视频", self)
         self.analyze_button.clicked.connect(self.analyze_videos)
+        self.analyze_button.setObjectName("btnAnalyze")
 
         self.export_button = QPushButton("导出结果", self)
         self.export_button.clicked.connect(self.export_result)
+        self.export_button.setObjectName("btnExport")
 
         self.clear_button = QPushButton("清空列表", self)
         self.clear_button.clicked.connect(self.clear_text)
+        self.clear_button.setObjectName("btnClear")
 
         # 创建布局
         video_text_layout = QHBoxLayout()
@@ -96,7 +102,7 @@ class VideoTrackerSystem(QMainWindow):
         self.setCentralWidget(container)
 
     def message(self, s):
-        self.text.appendPlainText(s)
+        self.text.appendPlainText(s+"\n")
 
     def show_error_message(self):
         # Create a QMessageBox with an error type
@@ -146,7 +152,6 @@ class VideoTrackerSystem(QMainWindow):
         # 这里添加分析视频的逻辑
         self.message("开始分析视频...")
         self.analyze_button.setEnabled(False)
-        time.sleep(0.5)
 
         items = []
         for x in range(self.video_list.count()):
@@ -169,7 +174,6 @@ class VideoTrackerSystem(QMainWindow):
         items = list(set(items))
 
         self.message(f"视频待分析列表: {items}")
-        time.sleep(0.5)
 
         for _item in items:
             if not os.path.exists(_item):
@@ -216,12 +220,28 @@ class VideoTrackerSystem(QMainWindow):
         self.message(f"视频分析器: {state_name}")
 
     def process_finished(self):
-        self.message("视频分析任务结束.\n")
+        self.message("视频分析任务结束.")
         self.p = None
         self.analyze_button.setEnabled(True)
 
     def export_result(self):
-        self.message("开始导出分析结果...\n")
+        if self.p is not None:
+            self.message("视频分析器正在运行中...")
+            return
+        self.message("开始导出分析结果...")
+        file_path, _ = QFileDialog.getSaveFileName(self, "保存为 Excel", "", "Excel Files (*.xlsx)")
+        if not file_path:
+            self.message("未指定导出excel路径")
+            return
+        
+        status = export_xlsx(file_path)
+        if not status:
+            self.message("分析结果导出失败, 请重新分析") 
+            return    
+
+        self.message("分析结果导出成功")
+        fp = os.path.join(get_current_dir(), ".tmp-task.txt")
+        os.remove(fp)
 
     def rm_clicked(self):
         sender_button = self.sender()
@@ -241,7 +261,7 @@ class VideoTrackerSystem(QMainWindow):
         if item is not None:
             row = self.video_list.row(item)
             self.video_list.takeItem(row)
-            self.text(f"移除:{label_text}")
+            self.message(f"移除:{label_text}")
 
     def closeEvent(self, event: QCloseEvent):
         # reply = QMessageBox.question(self, '信息', '你确定要退出吗?',
@@ -313,6 +333,7 @@ def main():
     QApplication.setApplicationName(metadata["Formal-Name"])
 
     app = QApplication(sys.argv)
+    app.setStyleSheet(style)
     main_window = VideoTrackerSystem()
     main_window.show()
     sys.exit(app.exec())
